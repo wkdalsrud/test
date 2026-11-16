@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>동기화 테스트</title>
+</head>
+<body>
+  <button id="login">구글 로그인</button>
+  <button id="logout" hidden>로그아웃</button>
+  <p id="status"></p>
+  <textarea id="memo" rows="8" style="width:100%" placeholder="여기에 입력하면 저장됩니다"></textarea>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyBSnwFlSLGZnywo1MG7y37C6lteawas85Q",
+  authDomain: "canada-app-f17c5.firebaseapp.com",
+  projectId: "canada-app-f17c5",
+  appId: "1:700174259173:web:b22cf21bc93a42a763950c"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+login.onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+logout.onclick = () => signOut(auth);
+
+let unsub;
+onAuthStateChanged(auth, (user) => {
+  login.hidden = !!user;
+  logout.hidden = !user;
+  status.textContent = user ? user.email + " 로 로그인됨" : "로그인이 필요합니다";
+  unsub?.();
+  memo.value = "";
+  if (!user) return;
+
+  const ref = doc(db, "users", user.uid, "data", "memo");
+  unsub = onSnapshot(ref, (snap) => {
+    if (snap.exists() && memo.value !== snap.data().text) memo.value = snap.data().text;
+  });
+  memo.oninput = () => setDoc(ref, { text: memo.value });
+});
+</script>
+</body>
+</html>
