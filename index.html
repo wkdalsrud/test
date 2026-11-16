@@ -32,24 +32,41 @@ login.onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
 logout.onclick = () => signOut(auth);
 
 let unsub;
+let composing = false;
+let saveFn = null;
+let timer;
+
+function scheduleSave() {
+  if (!saveFn) return;
+  clearTimeout(timer);
+  timer = setTimeout(saveFn, 600);
+}
+
+memo.addEventListener("compositionstart", () => { composing = true; });
+memo.addEventListener("compositionend", () => { composing = false; scheduleSave(); });
+memo.addEventListener("input", () => { if (!composing) scheduleSave(); });
+
 onAuthStateChanged(auth, (user) => {
   login.hidden = !!user;
   logout.hidden = !user;
   msg.textContent = user ? user.email + " 로 로그인됨" : "로그인이 필요합니다";
   unsub?.();
   memo.value = "";
+  saveFn = null;
   if (!user) return;
 
   const ref = doc(db, "users", user.uid, "data", "memo");
 
   unsub = onSnapshot(ref,
     (snap) => {
+      if (snap.metadata.hasPendingWrites) return; // 내가 방금 쓴 것은 무시
+      if (composing) return;                      // 한글 조합 중에는 덮어쓰지 않음
       if (snap.exists() && memo.value !== snap.data().text) memo.value = snap.data().text;
     },
     (err) => { msg.textContent = "읽기 실패: " + err.code + " / " + err.message; }
   );
 
-  memo.oninput = async () => {
+  saveFn = async () => {
     try {
       await setDoc(ref, { text: memo.value });
       msg.textContent = user.email + " 로그인됨 · 저장 완료";
