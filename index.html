@@ -8,7 +8,7 @@
 <body>
   <button id="login">구글 로그인</button>
   <button id="logout" hidden>로그아웃</button>
-  <p id="status"></p>
+  <p id="msg"></p>
   <textarea id="memo" rows="8" style="width:100%" placeholder="여기에 입력하면 저장됩니다"></textarea>
 
 <script type="module">
@@ -26,6 +26,7 @@ const app = initializeApp({
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
+const msg = document.getElementById("msg");
 
 login.onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
 logout.onclick = () => signOut(auth);
@@ -34,16 +35,28 @@ let unsub;
 onAuthStateChanged(auth, (user) => {
   login.hidden = !!user;
   logout.hidden = !user;
-  status.textContent = user ? user.email + " 로 로그인됨" : "로그인이 필요합니다";
+  msg.textContent = user ? user.email + " 로 로그인됨" : "로그인이 필요합니다";
   unsub?.();
   memo.value = "";
   if (!user) return;
 
   const ref = doc(db, "users", user.uid, "data", "memo");
-  unsub = onSnapshot(ref, (snap) => {
-    if (snap.exists() && memo.value !== snap.data().text) memo.value = snap.data().text;
-  });
-  memo.oninput = () => setDoc(ref, { text: memo.value });
+
+  unsub = onSnapshot(ref,
+    (snap) => {
+      if (snap.exists() && memo.value !== snap.data().text) memo.value = snap.data().text;
+    },
+    (err) => { msg.textContent = "읽기 실패: " + err.code + " / " + err.message; }
+  );
+
+  memo.oninput = async () => {
+    try {
+      await setDoc(ref, { text: memo.value });
+      msg.textContent = user.email + " 로그인됨 · 저장 완료";
+    } catch (err) {
+      msg.textContent = "저장 실패: " + err.code + " / " + err.message;
+    }
+  };
 });
 </script>
 </body>
